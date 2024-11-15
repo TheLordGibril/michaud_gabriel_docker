@@ -1,0 +1,281 @@
+services:
+  traefik:
+    image: traefik:v2.10
+    command:
+      - --api.insecure=true
+      - --providers.docker=true
+      - --entrypoints.web.address=:80
+    ports:
+      - "80:80"
+      - "8081:8080" # Port pour accéder à l'interface Web de Traefik
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock # Accès au socket Docker
+      - traefik-config:/etc/traefik
+  
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: 'mysql://user:password@db/my_database'
+      FLASK_APP: application.py
+      DEBUG: '1'
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: my_database
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - "5000:5000"
+    depends_on:
+      - db
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`backend.localhost`)"
+      - "traefik.http.services.backend.loadbalancer.server.port=5000"
+  
+  frontend:
+    build:
+      context: ./frontend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`frontend.localhost`)"
+      - "traefik.http.services.frontend.loadbalancer.server.port=5173"
+  
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    environment:
+      PMA_HOST: db
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: my_database
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    depends_on:
+      - db
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.phpmyadmin.rule=Host(`phpmyadmin.localhost`)"
+      - "traefik.http.services.phpmyadmin.loadbalancer.server.port=80"
+  
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: my_database
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+volumes:
+  mysql-data:
+  traefik-config:
+
+
+# FONCTIONNE MAIS PAS TRAEFIK
+# services:
+#   backend:
+#     build:
+#       context: ./backend
+#     ports:
+#       - "5000:5000"
+#     environment:
+#       FLASK_APP: application.py
+#       DEBUG: '1'
+#       MYSQL_HOST: mysql
+#       MYSQL_PORT: 3306
+#       MYSQL_DATABASE: my_database
+#       MYSQL_USER: user
+#       MYSQL_PASSWORD: password
+#     depends_on:
+#       - db
+#   frontend:
+#     build:
+#       context: ./frontend
+#     ports:
+#       - "5173:5173"
+#   phpmyadmin:
+#     image: phpmyadmin/phpmyadmin
+#     ports:
+#       - "8080:80"
+#     environment:
+#       PMA_HOST: db
+#       MYSQL_ROOT_PASSWORD: rootpassword
+#       MYSQL_DATABASE: my_database
+#       MYSQL_USER: user
+#       MYSQL_PASSWORD: password
+#     depends_on:
+#       - db
+#   db:
+#     image: mysql:8.0
+#     environment:
+#       MYSQL_ROOT_PASSWORD: rootpassword
+#       MYSQL_DATABASE: my_database
+#       MYSQL_USER: user
+#       MYSQL_PASSWORD: password
+#     ports:
+#       - "3306:3306"
+#     volumes:
+#       - mysql-data:/var/lib/mysql
+
+# volumes:
+#   mysql-data:
+
+# services:
+#   frontend:
+#     build:
+#       context: ./frontend
+#     environment:
+#       - NODE_ENV=production
+#     ports:
+#       - "5173:5173"
+#     labels:
+#       - "traefik.enable=true"
+#       - "traefik.http.routers.frontend.rule=Host(`frontend.localhost`)"
+#       - "traefik.http.services.frontend.loadbalancer.server.port=5173"
+#     depends_on:
+#       - backend
+
+#   backend:
+#     build:
+#       context: ./backend
+#     environment:
+#       - FLASK_ENV=production
+#     ports:
+#       - "5000:5000"
+#     labels:
+#       - "traefik.enable=true"
+#       - "traefik.http.routers.backend.rule=Host(`backend.localhost`)"
+#       - "traefik.http.services.backend.loadbalancer.server.port=5000"
+#     depends_on:
+#       - db
+
+#   db:
+#     image: mysql:8.0
+#     container_name: mysql_db
+#     environment:
+#       MYSQL_ROOT_PASSWORD: rootpassword
+#       MYSQL_DATABASE: mydatabase
+#       MYSQL_USER: user
+#       MYSQL_PASSWORD: password
+#     ports:
+#       - "3306:3306"
+#     volumes:
+#       - mysql_data:/var/lib/mysql
+
+#   phpmyadmin:
+#     image: phpmyadmin/phpmyadmin
+#     container_name: phpmyadmin
+#     environment:
+#       PMA_HOST: db
+#       MYSQL_ROOT_PASSWORD: rootpassword
+#     ports:
+#       - "8080:80"
+#     labels:
+#       - "traefik.enable=true"
+#       - "traefik.http.routers.phpmyadmin.rule=Host(`phpmyadmin.localhost`)"
+#       - "traefik.http.services.phpmyadmin.loadbalancer.server.port=80"
+#     depends_on:
+#       - db
+
+#   traefik:
+#     image: traefik:v2.5
+#     container_name: traefik
+#     command:
+#       - "--api.insecure=true"
+#       - "--providers.docker=true"
+#       - "--entrypoints.web.address=:80"
+#     ports:
+#       - "8081:8080"
+#     volumes:
+#       - "/var/run/docker.sock:/var/run/docker.sock:ro"
+
+# volumes:
+#   mysql_data:
+#     driver: local
+
+# # services:
+# #   frontend:
+# #     build:
+# #       context: ./frontend
+# #     environment:
+# #       - NODE_ENV=production
+# #     networks:
+# #       - traefik-net
+# #     labels:
+# #       - "traefik.enable=true"
+# #       - "traefik.http.routers.react_app.rule=Host(`frontend.localhost`)"
+# #       - "traefik.http.services.react_app.loadbalancer.server.port=3000"
+# #     expose:
+# #       - "3000"
+
+# #   backend:
+# #     build:
+# #       context: ./backend
+# #     container_name: flask_api
+# #     environment:
+# #       - FLASK_ENV=production
+# #     networks:
+# #       - traefik-net
+# #     labels:
+# #       - "traefik.enable=true"
+# #       - "traefik.http.routers.flask_api.rule=Host(`backend.localhost`)"
+# #       - "traefik.http.services.flask_api.loadbalancer.server.port=5000"
+# #     expose:
+# #       - "5000"
+# #     depends_on:
+# #       - db
+
+# #   db:
+# #     image: mysql:8.0
+# #     container_name: mysql_db
+# #     environment:
+# #       MYSQL_ROOT_PASSWORD: rootpassword
+# #       MYSQL_DATABASE: mydatabase
+# #       MYSQL_USER: user
+# #       MYSQL_PASSWORD: password
+# #     networks:
+# #       - traefik-net
+# #     volumes:
+# #       - mysql_data:/var/lib/mysql
+
+# #   phpmyadmin:
+# #     image: phpmyadmin/phpmyadmin
+# #     container_name: phpmyadmin
+# #     environment:
+# #       PMA_HOST: db
+# #       MYSQL_ROOT_PASSWORD: rootpassword
+# #     networks:
+# #       - traefik-net
+# #     labels:
+# #       - "traefik.enable=true"
+# #       - "traefik.http.routers.phpmyadmin.rule=Host(`phpmyadmin.localhost`)"
+# #       - "traefik.http.services.phpmyadmin.loadbalancer.server.port=80"
+# #     expose:
+# #       - "80"
+# #     depends_on:
+# #       - db
+
+# #   traefik:
+# #     image: traefik:v2.5
+# #     container_name: traefik
+# #     command:
+# #       - "--api.insecure=true"
+# #       - "--providers.docker=true"
+# #       - "--entrypoints.web.address=:80"
+# #     ports:
+# #       - "80:80"     # Pour accéder aux services
+# #       - "8081:8080"  # Interface Traefik
+# #     networks:
+# #       - traefik-net
+# #     volumes:
+# #       - "/var/run/docker.sock:/var/run/docker.sock:ro"
+# #     labels:
+# #       - "traefik.enable=true"
+# #       - "traefik.http.routers.traefik.rule=Host(`traefik.localhost`)"
+# #       - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+
+# # volumes:
+# #   mysql_data:
+# #     driver: local
